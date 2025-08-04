@@ -46,13 +46,19 @@ app.use(bodyParser.urlencoded({ extended: true, limit: '15mb' })); // 增加限�
 app.use(cookieParser()); // 解析 Cookie
 app.use(express.static(path.join(__dirname, 'public'))); // 静态文件
 
-// 创建会话目录
-const sessionDir = path.join(__dirname, 'sessions');
+// --- 代码修改开始 ---
+// 原来的代码试图在项目的 'sessions' 文件夹中创建会话文件。
+// 在 Vercel 的只读文件系统中，这是不允许的，并导致了程序崩溃。
+// 我们将存放会话的目录修改为 Vercel 唯一允许写入的临时目录 '/tmp'。
+// 注意：'/tmp' 目录中的文件是临时的，服务重启后会丢失。
+const sessionDir = path.join('/tmp', 'sessions');
 console.log('会话目录:', sessionDir);
 if (!fs.existsSync(sessionDir)) {
   console.log('创建会话目录...');
   fs.mkdirSync(sessionDir, { recursive: true });
 }
+// --- 代码修改结束 ---
+
 
 // 确保会话目录有正确的权限
 try {
@@ -286,7 +292,7 @@ app.get('/view/:id', async (req, res) => {
 
       // 如果只有一个代码块，并且它几乎占据了整个内容，直接使用该代码块的内容和类型
       if (codeBlocks.length === 1 &&
-          codeBlocks[0].content.length > page.html_content.length * 0.7) {
+        codeBlocks[0].content.length > page.html_content.length * 0.7) {
         processedContent = codeBlocks[0].content;
         detectedType = codeBlocks[0].type;
         console.log(`[DEBUG] 使用单个代码块内容，类型: ${detectedType}`);
@@ -331,10 +337,10 @@ app.get('/view/:id', async (req, res) => {
       // 没有找到代码块，使用原始的检测逻辑
       // 检查是否是 Mermaid 图表
       const mermaidPatterns = [
-        /^\s*graph\s+[A-Za-z\s]/i,        // 流程图 (包括 graph TD)
-        /^\s*flowchart\s+[A-Za-z\s]/i,    // 流程图 (新语法)
-        /^\s*sequenceDiagram/i,           // 序列图
-        /^\s*classDiagram/i,              // 类图
+        /^\s*graph\s+[A-Za-z\s]/i,       // 流程图 (包括 graph TD)
+        /^\s*flowchart\s+[A-Za-z\s]/i,   // 流程图 (新语法)
+        /^\s*sequenceDiagram/i,          // 序列图
+        /^\s*classDiagram/i,             // 类图
         /^\s*gantt/i,                    // 甘特图
         /^\s*pie/i,                      // 饼图
         /^\s*erDiagram/i,                // ER图
@@ -352,7 +358,7 @@ app.get('/view/:id', async (req, res) => {
 
       // 安全检查: 如果内容以<!DOCTYPE html>或<html开头，强制识别为HTML
       if (page.html_content.trim().startsWith('<!DOCTYPE html>') ||
-          page.html_content.trim().startsWith('<html')) {
+        page.html_content.trim().startsWith('<html')) {
         console.log('[DEBUG] 强制识别为完整HTML文档');
         detectedType = 'html';
       }
