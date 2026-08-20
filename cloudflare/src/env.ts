@@ -8,4 +8,6 @@ export interface Env {
   MAX_FILES?: string;
   MAX_FILE_BYTES?: string;
   MAX_SITE_BYTES?: string;
+  APP_HOST?: string;
+  SITES_BASE_DOMAIN?: string;
 }

@@ -65,6 +65,14 @@ export async function getSiteBySlug(db: D1Database, slug: string): Promise<SiteR
   return db.prepare('SELECT * FROM sites WHERE slug = ?').bind(slug).first<SiteRecord>();
 }
 
+export async function getSiteByHostname(db: D1Database, hostname: string): Promise<SiteRecord | null> {
+  return db.prepare(
+    `SELECT sites.* FROM sites
+     INNER JOIN domains ON domains.site_id = sites.id
+     WHERE domains.hostname = ?`
+  ).bind(hostname).first<SiteRecord>();
+}
+
 export async function getVersionById(db: D1Database, versionId: string): Promise<VersionRecord | null> {
   return db.prepare('SELECT * FROM versions WHERE id = ?').bind(versionId).first<VersionRecord>();
 }
