@@ -90,6 +90,22 @@
           </div>
           <a id="openButton" class="primary-button link-button" target="_blank" rel="noopener noreferrer">打开站点</a>
         </section>
+
+        <section id="domainPanel" class="panel domain-panel" hidden>
+          <p class="eyebrow">CUSTOM DOMAIN</p>
+          <h2>绑定你在 Cloudflare 托管的域名</h2>
+          <p class="summary">QuickShare 只记录映射，不会调用 Cloudflare API。添加后按下方指引在 Dashboard 完成一次路由绑定。</p>
+          <form id="domainForm" class="domain-form">
+            <label for="hostname">域名（不带 https:// 和端口）</label>
+            <div class="domain-form-row">
+              <input id="hostname" type="text" placeholder="demo.example.com" autocomplete="off" required>
+              <button class="primary-button" type="submit">添加映射</button>
+            </div>
+          </form>
+          <p id="domainError" class="form-error" role="alert" hidden></p>
+          <div id="domainList" class="domain-list"></div>
+          <div id="domainInstructions" class="instructions" hidden></div>
+        </section>
       </section>
     </main>
     <script src="/vendor/zip.min.js"></script>

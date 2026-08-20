@@ -3,6 +3,7 @@ import type { Env } from './env';
 import { getSiteById } from './repositories/sites';
 import { isManagementHost, isSiteRequestHost, requestHostname, resolveSiteByHost } from './routing';
 import { authRoutes } from './routes/auth';
+import { domainRoutes } from './routes/domains';
 import { deploymentRoutes } from './routes/deployments';
 import { serveSite } from './site-responder';
 
@@ -20,6 +21,7 @@ app.get('/api/health', (c) => c.json({
 
 app.route('/api/auth', authRoutes);
 app.route('/api/deployments', deploymentRoutes);
+app.route('/api/domains', domainRoutes);
 
 app.all('*', async (c) => {
   const pathPrefix = (c.env.SITE_PATH_PREFIX || '/s').replace(/\/$/, '');

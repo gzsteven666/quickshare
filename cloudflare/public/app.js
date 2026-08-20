@@ -1,7 +1,7 @@
 import { buildZipManifest, DEFAULT_LIMITS } from './app-core.js';
 
 const zipLib = globalThis.zip;
-const state = { archive: null, busy: false, previewUrl: '' };
+const state = { archive: null, busy: false, previewUrl: '', siteId: '' };
 
 const $ = (id) => document.getElementById(id);
 const loginView = $('loginView');
@@ -31,6 +31,12 @@ const resultSummary = $('resultSummary');
 const previewLink = $('previewLink');
 const openButton = $('openButton');
 const copyButton = $('copyButton');
+const domainPanel = $('domainPanel');
+const domainForm = $('domainForm');
+const hostnameInput = $('hostname');
+const domainError = $('domainError');
+const domainList = $('domainList');
+const domainInstructions = $('domainInstructions');
 
 function formatBytes(bytes) {
   if (bytes < 1024) return `${bytes} B`;
@@ -184,12 +190,15 @@ async function deployArchive() {
       method: 'POST',
       body: JSON.stringify({ entryPath: manifest.entryPath })
     });
+    state.siteId = published.siteId;
     state.previewUrl = new URL(published.previewUrl, location.origin).href;
     previewLink.href = state.previewUrl;
     previewLink.textContent = state.previewUrl;
     openButton.href = state.previewUrl;
     resultSummary.textContent = `${manifest.files.length} 个文件已发布，入口文件为 ${manifest.entryPath}。`;
     resultPanel.hidden = false;
+    domainPanel.hidden = false;
+    await loadDomains();
     archiveStatus.textContent = '已发布';
     setProgress(manifest.totalBytes, manifest.totalBytes, '发布完成');
   } catch (error) {
@@ -209,12 +218,79 @@ async function deployArchive() {
 function resetArchive() {
   if (state.archive?.reader) void state.archive.reader.close().catch(() => {});
   state.archive = null;
+  state.siteId = '';
   archivePanel.hidden = true;
   resultPanel.hidden = true;
+  domainPanel.hidden = true;
+  domainList.replaceChildren();
+  domainInstructions.hidden = true;
   progressArea.hidden = true;
   zipInput.value = '';
   setMessage(deployError, '');
   progressBar.style.width = '0%';
+}
+
+function renderDomainInstructions(instructions) {
+  domainInstructions.replaceChildren();
+  if (!instructions) {
+    domainInstructions.hidden = true;
+    return;
+  }
+  const title = document.createElement('strong');
+  title.textContent = instructions.mode === 'wildcard-route' ? '泛域名路由指引' : '精确 Custom Domain 指引';
+  const list = document.createElement('ol');
+  for (const step of instructions.steps || []) {
+    const item = document.createElement('li');
+    item.textContent = step;
+    list.append(item);
+  }
+  const note = document.createElement('p');
+  note.textContent = instructions.note || '';
+  domainInstructions.append(title, list, note);
+  domainInstructions.hidden = false;
+}
+
+function renderDomains(domains) {
+  domainList.replaceChildren();
+  if (!domains.length) {
+    const empty = document.createElement('p');
+    empty.className = 'summary';
+    empty.textContent = '还没有绑定域名。';
+    domainList.append(empty);
+    return;
+  }
+  for (const domain of domains) {
+    const row = document.createElement('div');
+    row.className = 'domain-item';
+    const link = document.createElement('a');
+    link.href = `https://${domain.hostname}/`;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.textContent = domain.hostname;
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.textContent = '移除映射';
+    remove.addEventListener('click', async () => {
+      try {
+        await apiRequest(`/api/domains/${encodeURIComponent(domain.hostname)}?siteId=${encodeURIComponent(state.siteId)}`, { method: 'DELETE' });
+        await loadDomains();
+      } catch (error) {
+        setMessage(domainError, error instanceof Error ? error.message : '移除失败。');
+      }
+    });
+    row.append(link, remove);
+    domainList.append(row);
+  }
+}
+
+async function loadDomains() {
+  if (!state.siteId) return;
+  try {
+    const data = await apiRequest(`/api/domains?siteId=${encodeURIComponent(state.siteId)}`);
+    renderDomains(data.domains || []);
+  } catch (error) {
+    setMessage(domainError, error instanceof Error ? error.message : '域名列表读取失败。');
+  }
 }
 
 loginForm.addEventListener('submit', async (event) => {
@@ -263,6 +339,22 @@ dropzone.addEventListener('drop', (event) => {
 zipInput.addEventListener('change', () => chooseZip(zipInput.files[0]));
 deployButton.addEventListener('click', () => void deployArchive());
 clearButton.addEventListener('click', resetArchive);
+domainForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (!state.siteId) return;
+  setMessage(domainError, '');
+  try {
+    const data = await apiRequest('/api/domains', {
+      method: 'POST',
+      body: JSON.stringify({ siteId: state.siteId, hostname: hostnameInput.value.trim() })
+    });
+    hostnameInput.value = '';
+    renderDomainInstructions(data.instructions);
+    await loadDomains();
+  } catch (error) {
+    setMessage(domainError, error instanceof Error ? error.message : '域名映射失败。');
+  }
+});
 copyButton.addEventListener('click', async () => {
   if (!state.previewUrl) return;
   try {
