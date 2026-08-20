@@ -1,0 +1,2 @@
+ADMIN_PASSWORD=replace-me
+COOKIE_SIGNING_KEY=replace-with-a-random-32-byte-secret

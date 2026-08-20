@@ -1,0 +1,31 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "quickshare-cloudflare-test",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-08-20",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*", "/s/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "quickshare-db-test",
+      "database_id": "00000000-0000-0000-0000-000000000001"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "SITES",
+      "bucket_name": "quickshare-sites-test"
+    }
+  ],
+  "vars": {
+    "SITE_PATH_PREFIX": "/s",
+    "MAX_FILES": "500",
+    "MAX_FILE_BYTES": "8388608",
+    "MAX_SITE_BYTES": "31457280"
+  }
+}
