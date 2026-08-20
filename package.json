@@ -4,11 +4,11 @@
   "description": "HTML代码分享工具 - Express版本",
   "main": "app.js",
   "scripts": {
-    "start": "NODE_ENV=production node --max-old-space-size=1024 app.js",
-    "dev": "NODE_ENV=development nodemon app.js",
+    "start": "NODE_ENV=production node --max-old-space-size=1024 server.js",
+    "dev": "NODE_ENV=development nodemon server.js",
     "test": "NODE_ENV=test node --test",
     "test:watch": "NODE_ENV=test node --test --watch",
-    "prod": "NODE_ENV=production node --max-old-space-size=1024 app.js"
+    "prod": "NODE_ENV=production node --max-old-space-size=1024 server.js"
   },
   "keywords": [
     "html",

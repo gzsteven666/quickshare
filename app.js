@@ -10,7 +10,16 @@ const cookieParser = require('cookie-parser');
 const session = require('express-session');
 const FileStore = require('session-file-store')(session);
 const fs = require('fs');
-const { initDatabase } = require('./models/db');
+const multer = require('multer');
+const AdmZip = require('adm-zip');
+const {
+  SiteValidationError,
+  createSite,
+  getSite,
+  getSiteFile,
+  normalizeArchivePath,
+  prepareSiteFiles
+} = require('./models/sites');
 
 // 添加调试日志
 console.log('应用启动...');
@@ -32,9 +41,13 @@ const pagesRoutes = require('./routes/pages');
 
 // 初始化应用
 const app = express();
-// 确保在服务器上使用正确的端口
-const PORT = process.env.NODE_ENV === 'production' ? 8888 : config.port;
-
+const siteUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 20 * 1024 * 1024,
+    files: 1
+  }
+});
 // 将配置添加到应用本地变量中，便于在中间件中访问
 app.locals.config = config;
 
@@ -204,6 +217,46 @@ app.post('/api/pages/create', isAuthenticated, async (req, res) => {
   }
 });
 
+// 拖拽 ZIP 部署静态站点
+app.post('/api/sites/deploy', isAuthenticated, (req, res) => {
+  siteUpload.single('site')(req, res, async (uploadError) => {
+    try {
+      if (uploadError) {
+        const message = uploadError.code === 'LIMIT_FILE_SIZE'
+          ? 'ZIP 文件不能超过 20 MB'
+          : '上传失败，请检查 ZIP 文件后重试';
+        return res.status(400).json({ success: false, error: message });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ success: false, error: '请选择要部署的 ZIP 文件' });
+      }
+
+      if (!req.file.originalname.toLowerCase().endsWith('.zip')) {
+        return res.status(400).json({ success: false, error: '目前仅支持 ZIP 格式的静态站点' });
+      }
+
+      const zip = new AdmZip(req.file.buffer);
+      const preparedSite = prepareSiteFiles(zip.getEntries());
+      const siteName = path.basename(req.file.originalname, path.extname(req.file.originalname)).slice(0, 120);
+      const deployment = await createSite(siteName, preparedSite);
+
+      return res.status(201).json({
+        success: true,
+        ...deployment,
+        url: `/site/${deployment.siteId}/`
+      });
+    } catch (error) {
+      if (error instanceof SiteValidationError) {
+        return res.status(400).json({ success: false, error: error.message });
+      }
+
+      console.error('部署 ZIP 站点错误:', error);
+      return res.status(500).json({ success: false, error: '部署失败，请稍后重试' });
+    }
+  });
+});
+
 // 其他 API 不需要认证
 app.use('/api/pages', pagesRoutes);
 
@@ -236,8 +289,63 @@ app.get('/validate-password/:id', async (req, res) => {
 
 // 首页路由 - 需要登录才能访问
 app.get('/', isAuthenticated, (req, res) => {
-  res.render('index', { title: 'HTML-Go | 分享 HTML 代码的简单方式' });
+  res.render('index', { title: 'QuickShare | 拖入 ZIP，立即发布' });
 });
+
+app.get('/site/:id', (req, res) => {
+  res.redirect(301, `/site/${req.params.id}/`);
+});
+
+async function serveSiteFile(req, res) {
+  try {
+    const site = await getSite(req.params.id);
+    if (!site) {
+      return res.status(404).render('error', {
+        title: '站点未找到',
+        message: '这个部署不存在或已经失效'
+      });
+    }
+
+    const rawPath = req.params[0] || '';
+    let requestedPath = site.entry_path;
+    if (rawPath) {
+      requestedPath = normalizeArchivePath(rawPath);
+    }
+
+    const candidates = [requestedPath];
+    if (rawPath.endsWith('/')) candidates.push(`${requestedPath}/index.html`);
+    if (rawPath && !path.posix.extname(requestedPath)) {
+      candidates.push(`${requestedPath}.html`, `${requestedPath}/index.html`);
+    }
+
+    let file = null;
+    for (const candidate of [...new Set(candidates)]) {
+      file = await getSiteFile(site.id, candidate);
+      if (file) break;
+    }
+
+    if (!file) {
+      return res.status(404).send('File not found');
+    }
+
+    res.set('Content-Type', file.mime_type);
+    res.set('X-Content-Type-Options', 'nosniff');
+    res.set('Cache-Control', file.mime_type.startsWith('text/html')
+      ? 'no-cache'
+      : 'public, max-age=31536000, immutable');
+    return res.send(file.content);
+  } catch (error) {
+    if (error instanceof SiteValidationError) {
+      return res.status(400).send('Invalid file path');
+    }
+
+    console.error('读取静态站点文件错误:', error);
+    return res.status(500).send('Unable to load site');
+  }
+}
+
+app.get('/site/:id/', serveSiteFile);
+app.get('/site/:id/*', serveSiteFile);
 
 // 导入代码类型检测和内容渲染工具
 const { detectCodeType, CODE_TYPES } = require('./utils/codeDetector');
@@ -405,30 +513,6 @@ app.use((req, res) => {
     title: '页面未找到',
     message: '您请求的页面不存在'
   });
-});
-
-// 启动应用
-initDatabase().then(() => {
-  // 添加更多调试日志
-  console.log('数据库初始化成功');
-  console.log(`当前环境: ${process.env.NODE_ENV}`);
-  console.log(`配置端口: ${config.port}`);
-  console.log(`实际使用端口: ${PORT}`);
-  console.log(`日志级别: ${config.logLevel}`);
-
-  app.listen(PORT, () => {
-    console.log(`服务器运行在 http://localhost:${PORT}`);
-
-    // 添加路由处理器日志
-    console.log('已注册的路由:');
-    app._router.stack.forEach(middleware => {
-      if(middleware.route) { // 路由
-        console.log(`${Object.keys(middleware.route.methods)} ${middleware.route.path}`);
-      }
-    });
-  });
-}).catch(err => {
-  console.error('数据库初始化失败:', err);
 });
 
 module.exports = app;
