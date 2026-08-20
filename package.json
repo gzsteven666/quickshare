@@ -6,7 +6,8 @@
   "scripts": {
     "start": "NODE_ENV=production node --max-old-space-size=1024 app.js",
     "dev": "NODE_ENV=development nodemon app.js",
-    "test": "NODE_ENV=test node app.js",
+    "test": "NODE_ENV=test node --test",
+    "test:watch": "NODE_ENV=test node --test --watch",
     "prod": "NODE_ENV=production node --max-old-space-size=1024 app.js"
   },
   "keywords": [
@@ -19,6 +20,7 @@
   "license": "ISC",
   "dependencies": {
     "@mermaid-js/mermaid-cli": "^11.4.2",
+    "adm-zip": "^0.5.18",
     "body-parser": "^1.20.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
@@ -32,10 +34,12 @@
     "mermaid": "^11.6.0",
     "mermaid-render": "^1.0.9",
     "morgan": "^1.10.0",
+    "multer": "^2.2.0",
     "session-file-store": "^1.5.0",
     "sqlite3": "^5.1.7"
   },
   "devDependencies": {
-    "nodemon": "^2.0.22"
+    "nodemon": "^2.0.22",
+    "supertest": "^7.1.4"
   }
 }
