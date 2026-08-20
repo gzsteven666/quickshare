@@ -22,6 +22,7 @@ npm install
 cp .dev.vars.example .dev.vars
 npm run typecheck
 npm test
+npm run db:migrate:local
 npm run dev
 ```
 
@@ -60,10 +61,13 @@ npm run typecheck          # TypeScript 检查
 npm test                   # Vitest + Cloudflare Workers 测试池
 npm run db:migrate:local   # 应用本地 D1 迁移
 npm run db:migrate:remote  # 应用远程 D1 迁移
+npm run accept:zip -- path/to/site.zip  # 用真实 ZIP 做本地端到端验收
 npm run deploy             # 远程迁移后部署 Worker
 ```
 
 `deploy` 脚本使用 D1 binding 名称 `DB`，这样一键部署创建的数据库 ID 被 Cloudflare 写回配置后仍能正确迁移。
+
+真实 ZIP 验收前先运行 `npm run db:migrate:local` 和 `npm run dev`，然后执行 `npm run accept:zip -- "C:\\path\\site.zip" http://127.0.0.1:8799`。脚本会登录、创建清单、逐文件上传、原子发布，并检查预览 HTML、CSP 和 CSS 资源。
 
 ## 目录
 
