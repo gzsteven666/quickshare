@@ -2,6 +2,7 @@
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "quickshare-cloudflare",
   "main": "src/worker.ts",
+  "workers_dev": true,
   "compatibility_date": "2026-08-20",
   "compatibility_flags": ["nodejs_compat"],
   "assets": {
@@ -26,6 +27,9 @@
     "MAX_FILES": "500",
     "MAX_FILE_BYTES": "8388608",
     "MAX_SITE_BYTES": "31457280"
+  },
+  "secrets": {
+    "required": ["ADMIN_PASSWORD", "COOKIE_SIGNING_KEY"]
   },
   "observability": {
     "enabled": true

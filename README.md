@@ -1,5 +1,13 @@
 # HTML代码分享工具 (Express版本)
 
+## Cloudflare 一键部署版
+
+如果你要像 Netlify Drop 一样把静态站点 ZIP 拖进去就部署，可以直接使用独立的 Cloudflare 版本：
+
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/gzsteven666/quickshare/tree/main/cloudflare)
+
+它使用 Workers + D1 + R2，首次部署提供 `workers.dev` 管理地址。完整配置、域名绑定和本地测试说明见 [`cloudflare/README.md`](cloudflare/README.md)。
+
 这是一个基于Express.js开发的HTML代码分享工具，允许用户创建、分享和查看HTML代码片段。支持密码保护、会话管理和现代化的用户界面。
 
 ## 功能特点
@@ -237,4 +245,4 @@ ISC License
 - v1.0.0: 初始版本，基本的HTML分享功能
 - 支持密码保护和用户认证
 - 添加Docker支持
-- 优化用户界面和体验 
+- 优化用户界面和体验
