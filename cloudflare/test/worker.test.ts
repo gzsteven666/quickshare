@@ -15,6 +15,6 @@ describe('QuickShare Cloudflare worker', () => {
     const response = await SELF.fetch('https://quickshare.test/');
 
     expect(response.status).toBe(200);
-    await expect(response.text()).resolves.toContain('QuickShare Cloudflare');
+    await expect(response.text()).resolves.toContain('QuickShare');
   });
 });

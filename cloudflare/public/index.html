@@ -3,12 +3,96 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>QuickShare Cloudflare</title>
+    <meta name="theme-color" content="#f6f3ee">
+    <title>QuickShare · Cloudflare Drop</title>
+    <link rel="stylesheet" href="/styles.css">
   </head>
   <body>
-    <main>
-      <h1>QuickShare Cloudflare</h1>
-      <p>Cloudflare 原生版本已部署，拖拽发布控制台即将接入。</p>
+    <main class="shell">
+      <header class="topbar">
+        <a class="brand" href="/" aria-label="QuickShare 首页">
+          <span class="brand-mark">Q</span>
+          <span>QuickShare</span>
+        </a>
+        <span class="environment">Cloudflare / workers.dev</span>
+      </header>
+
+      <section id="loginView" class="panel login-panel">
+        <p class="eyebrow">STATIC SITE DROP</p>
+        <h1>把 ZIP 拖进来，发布一个站点。</h1>
+        <p class="lede">QuickShare 会在浏览器中读取压缩包，只上传静态文件到 Cloudflare R2。</p>
+        <form id="loginForm" class="stack-form">
+          <label for="password">管理员密码</label>
+          <input id="password" name="password" type="password" autocomplete="current-password" required>
+          <button class="primary-button" type="submit">进入控制台</button>
+          <p id="loginError" class="form-error" role="alert" hidden></p>
+        </form>
+      </section>
+
+      <section id="appView" class="app-view" hidden>
+        <div class="app-heading">
+          <div>
+            <p class="eyebrow">STATIC SITE DROP</p>
+            <h1>发布你的静态站点</h1>
+            <p class="lede">拖入包含 <code>index.html</code> 的 ZIP。压缩包不会离开浏览器，Worker 只接收逐个静态文件。</p>
+          </div>
+          <button id="logoutButton" class="quiet-button" type="button">退出</button>
+        </div>
+
+        <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="拖入 ZIP 文件或选择文件">
+          <input id="zipInput" type="file" accept=".zip,application/zip" hidden>
+          <div class="drop-icon">↓</div>
+          <h2>拖入 ZIP 文件</h2>
+          <p>或 <button id="chooseButton" class="inline-button" type="button">选择文件</button></p>
+          <p class="drop-hint">限制：最多 500 个文件，单文件 8 MB，站点 30 MB</p>
+        </div>
+
+        <section id="archivePanel" class="panel archive-panel" hidden>
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">READY TO DEPLOY</p>
+              <h2 id="archiveName">ZIP 文件</h2>
+            </div>
+            <span id="archiveStatus" class="status-pill">已读取</span>
+          </div>
+          <p id="fileSummary" class="summary"></p>
+          <div class="field-grid">
+            <label>
+              站点名称
+              <input id="siteName" type="text" maxlength="120" required>
+            </label>
+            <label>
+              slug
+              <input id="siteSlug" type="text" maxlength="63" pattern="[a-z0-9-]+" required>
+            </label>
+          </div>
+          <div class="actions">
+            <button id="deployButton" class="primary-button" type="button">开始发布</button>
+            <button id="clearButton" class="quiet-button" type="button">换一个 ZIP</button>
+          </div>
+          <div id="progressArea" class="progress-area" hidden>
+            <div class="progress-label"><span id="progressText">准备上传…</span><span id="progressPercent">0%</span></div>
+            <div class="progress-track"><div id="progressBar" class="progress-bar"></div></div>
+          </div>
+          <p id="deployError" class="form-error" role="alert" hidden></p>
+        </section>
+
+        <section id="resultPanel" class="panel result-panel" hidden>
+          <p class="eyebrow">PUBLISHED</p>
+          <h2>站点已经上线</h2>
+          <p id="resultSummary" class="summary"></p>
+          <div class="result-links">
+            <div>
+              <span>预览地址</span>
+              <a id="previewLink" target="_blank" rel="noopener noreferrer"></a>
+            </div>
+            <button id="copyButton" class="quiet-button" type="button">复制地址</button>
+          </div>
+          <a id="openButton" class="primary-button link-button" target="_blank" rel="noopener noreferrer">打开站点</a>
+        </section>
+      </section>
     </main>
+    <script src="/vendor/zip.min.js"></script>
+    <script type="module" src="/app.js"></script>
   </body>
 </html>

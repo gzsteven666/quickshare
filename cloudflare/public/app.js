@@ -1,0 +1,284 @@
+import { buildZipManifest, DEFAULT_LIMITS } from './app-core.js';
+
+const zipLib = globalThis.zip;
+const state = { archive: null, busy: false, previewUrl: '' };
+
+const $ = (id) => document.getElementById(id);
+const loginView = $('loginView');
+const appView = $('appView');
+const loginForm = $('loginForm');
+const loginError = $('loginError');
+const passwordInput = $('password');
+const logoutButton = $('logoutButton');
+const dropzone = $('dropzone');
+const zipInput = $('zipInput');
+const chooseButton = $('chooseButton');
+const archivePanel = $('archivePanel');
+const archiveName = $('archiveName');
+const archiveStatus = $('archiveStatus');
+const fileSummary = $('fileSummary');
+const siteNameInput = $('siteName');
+const siteSlugInput = $('siteSlug');
+const deployButton = $('deployButton');
+const clearButton = $('clearButton');
+const progressArea = $('progressArea');
+const progressText = $('progressText');
+const progressPercent = $('progressPercent');
+const progressBar = $('progressBar');
+const deployError = $('deployError');
+const resultPanel = $('resultPanel');
+const resultSummary = $('resultSummary');
+const previewLink = $('previewLink');
+const openButton = $('openButton');
+const copyButton = $('copyButton');
+
+function formatBytes(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function setMessage(element, message) {
+  element.textContent = message || '';
+  element.hidden = !message;
+}
+
+async function apiRequest(path, options = {}) {
+  const headers = new Headers(options.headers || {});
+  if (typeof options.body === 'string' && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+  const response = await fetch(path, {
+    ...options,
+    headers,
+    credentials: 'same-origin'
+  });
+  const contentType = response.headers.get('Content-Type') || '';
+  const data = contentType.includes('application/json') ? await response.json() : null;
+  if (!response.ok) {
+    throw new Error(data?.error || `请求失败（${response.status}）`);
+  }
+  return data;
+}
+
+function showApp(authenticated) {
+  loginView.hidden = authenticated;
+  appView.hidden = !authenticated;
+  if (authenticated) passwordInput.value = '';
+}
+
+function slugFromFilename(filename) {
+  const stem = filename.replace(/\.zip$/i, '');
+  const slug = stem.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 52);
+  return slug || `site-${Date.now().toString(36)}`;
+}
+
+function chooseZip(file) {
+  if (!file) return;
+  if (!/\.zip$/i.test(file.name) && file.type !== 'application/zip') {
+    setMessage(deployError, '请选择 .zip 压缩包。');
+    return;
+  }
+  void inspectZip(file);
+}
+
+async function inspectZip(file) {
+  if (!zipLib) {
+    setMessage(deployError, 'ZIP 解析组件未加载，请刷新页面重试。');
+    return;
+  }
+  resetArchive();
+  archiveName.textContent = file.name;
+  archiveStatus.textContent = '读取中';
+  archivePanel.hidden = false;
+  setMessage(deployError, '');
+  try {
+    const reader = new zipLib.ZipReader(new zipLib.BlobReader(file));
+    const entries = await reader.getEntries();
+    const manifest = buildZipManifest(entries, DEFAULT_LIMITS);
+    state.archive = { file, reader, manifest };
+    archiveStatus.textContent = '已读取';
+    fileSummary.textContent = `${manifest.files.length} 个文件 · ${formatBytes(manifest.totalBytes)} · 入口：${manifest.entryPath}`;
+    siteNameInput.value = file.name.replace(/\.zip$/i, '');
+    siteSlugInput.value = slugFromFilename(file.name);
+    resultPanel.hidden = true;
+  } catch (error) {
+    archiveStatus.textContent = '读取失败';
+    setMessage(deployError, error instanceof Error ? error.message : 'ZIP 无法读取。');
+    state.archive = null;
+  }
+}
+
+function setProgress(done, total, message) {
+  const percent = total === 0 ? 100 : Math.min(100, Math.round(done / total * 100));
+  progressText.textContent = message;
+  progressPercent.textContent = `${percent}%`;
+  progressBar.style.width = `${percent}%`;
+}
+
+async function uploadEntry(entry, created, onComplete) {
+  let lastError;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const blob = await entry.entry.getData(new zipLib.BlobWriter(entry.mimeType));
+      const path = new URL(`/api/deployments/${encodeURIComponent(created.versionId)}/files`, location.origin);
+      path.searchParams.set('path', entry.path);
+      await apiRequest(path, {
+        method: 'PUT',
+        headers: { 'Content-Type': entry.mimeType },
+        body: blob
+      });
+      onComplete(entry);
+      return;
+    } catch (error) {
+      lastError = error;
+      if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 300 * (attempt + 1)));
+    }
+  }
+  throw new Error(`${entry.path} 上传失败：${lastError instanceof Error ? lastError.message : '未知错误'}`);
+}
+
+async function uploadEntries(entries, created, totalBytes) {
+  let cursor = 0;
+  let completedBytes = 0;
+  const worker = async () => {
+    while (cursor < entries.length) {
+      const index = cursor;
+      cursor += 1;
+      await uploadEntry(entries[index], created, (entry) => {
+        completedBytes += entry.size;
+        setProgress(completedBytes, totalBytes, `已上传 ${entry.path}`);
+      });
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(4, entries.length) }, () => worker()));
+}
+
+async function deployArchive() {
+  if (!state.archive || state.busy) return;
+  if (!siteNameInput.value.trim() || !siteSlugInput.value.trim()) {
+    setMessage(deployError, '请填写站点名称和 slug。');
+    return;
+  }
+  state.busy = true;
+  deployButton.disabled = true;
+  clearButton.disabled = true;
+  progressArea.hidden = false;
+  resultPanel.hidden = true;
+  setMessage(deployError, '');
+  setProgress(0, state.archive.manifest.totalBytes, '正在创建发布版本…');
+  try {
+    const manifest = state.archive.manifest;
+    const created = await apiRequest('/api/deployments', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: siteNameInput.value.trim(),
+        slug: siteSlugInput.value.trim(),
+        entryPath: manifest.entryPath,
+        files: manifest.files.map(({ path, size, mimeType }) => ({ path, size, mimeType }))
+      })
+    });
+    await uploadEntries(manifest.files, created, manifest.totalBytes);
+    setProgress(manifest.totalBytes, manifest.totalBytes, '正在切换线上版本…');
+    const published = await apiRequest(`/api/deployments/${encodeURIComponent(created.versionId)}/finalize`, {
+      method: 'POST',
+      body: JSON.stringify({ entryPath: manifest.entryPath })
+    });
+    state.previewUrl = new URL(published.previewUrl, location.origin).href;
+    previewLink.href = state.previewUrl;
+    previewLink.textContent = state.previewUrl;
+    openButton.href = state.previewUrl;
+    resultSummary.textContent = `${manifest.files.length} 个文件已发布，入口文件为 ${manifest.entryPath}。`;
+    resultPanel.hidden = false;
+    archiveStatus.textContent = '已发布';
+    setProgress(manifest.totalBytes, manifest.totalBytes, '发布完成');
+  } catch (error) {
+    setMessage(deployError, error instanceof Error ? error.message : '发布失败，请重试。');
+    archiveStatus.textContent = '发布失败';
+  } finally {
+    state.busy = false;
+    deployButton.disabled = false;
+    clearButton.disabled = false;
+    if (state.archive?.reader) {
+      await state.archive.reader.close().catch(() => {});
+      state.archive.reader = null;
+    }
+  }
+}
+
+function resetArchive() {
+  if (state.archive?.reader) void state.archive.reader.close().catch(() => {});
+  state.archive = null;
+  archivePanel.hidden = true;
+  resultPanel.hidden = true;
+  progressArea.hidden = true;
+  zipInput.value = '';
+  setMessage(deployError, '');
+  progressBar.style.width = '0%';
+}
+
+loginForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  setMessage(loginError, '');
+  try {
+    await apiRequest('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ password: passwordInput.value })
+    });
+    showApp(true);
+  } catch (error) {
+    setMessage(loginError, error instanceof Error ? error.message : '登录失败。');
+  }
+});
+
+logoutButton.addEventListener('click', async () => {
+  try { await apiRequest('/api/auth/logout', { method: 'POST' }); } catch { /* session may already be gone */ }
+  resetArchive();
+  showApp(false);
+});
+
+chooseButton.addEventListener('click', (event) => {
+  event.stopPropagation();
+  zipInput.click();
+});
+dropzone.addEventListener('click', (event) => {
+  if (!event.target.closest('button')) zipInput.click();
+});
+dropzone.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault();
+    zipInput.click();
+  }
+});
+dropzone.addEventListener('dragover', (event) => {
+  event.preventDefault();
+  dropzone.classList.add('is-dragging');
+});
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('is-dragging'));
+dropzone.addEventListener('drop', (event) => {
+  event.preventDefault();
+  dropzone.classList.remove('is-dragging');
+  chooseZip(event.dataTransfer.files[0]);
+});
+zipInput.addEventListener('change', () => chooseZip(zipInput.files[0]));
+deployButton.addEventListener('click', () => void deployArchive());
+clearButton.addEventListener('click', resetArchive);
+copyButton.addEventListener('click', async () => {
+  if (!state.previewUrl) return;
+  try {
+    await navigator.clipboard.writeText(state.previewUrl);
+    copyButton.textContent = '已复制';
+    setTimeout(() => { copyButton.textContent = '复制地址'; }, 1400);
+  } catch {
+    copyButton.textContent = '复制失败';
+  }
+});
+
+void (async () => {
+  try {
+    const session = await apiRequest('/api/auth/me');
+    showApp(session.authenticated === true);
+  } catch {
+    showApp(false);
+  }
+})();
