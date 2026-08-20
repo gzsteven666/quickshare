@@ -11,6 +11,14 @@ try {
 }
 
 const env = process.env.NODE_ENV || 'development';
+const siteLimits = {
+  maxZipBytes: 20 * 1024 * 1024,
+  maxFiles: 500,
+  maxFileBytes: 8 * 1024 * 1024,
+  maxTotalBytes: 30 * 1024 * 1024,
+  maxPathLength: 240,
+  maxCompressionRatio: 100
+};
 
 const config = {
   // 开发环境配置
@@ -18,7 +26,8 @@ const config = {
     port: process.env.PORT || 5678,
     logLevel: 'dev',
     authEnabled: process.env.AUTH_ENABLED === 'true',
-    authPassword: process.env.AUTH_PASSWORD || 'admin123'
+    authPassword: process.env.AUTH_PASSWORD || 'admin123',
+    siteLimits
   },
 
   // 生产环境配置
@@ -26,7 +35,8 @@ const config = {
     port: process.env.PORT || 8888,
     logLevel: 'combined',
     authEnabled: process.env.AUTH_ENABLED === 'true',
-    authPassword: process.env.AUTH_PASSWORD || 'admin123'
+    authPassword: process.env.AUTH_PASSWORD || 'admin123',
+    siteLimits
   },
 
   // 测试环境配置
@@ -34,7 +44,8 @@ const config = {
     port: process.env.PORT || 3000,
     logLevel: 'dev',
     authEnabled: process.env.AUTH_ENABLED === 'true',
-    authPassword: process.env.AUTH_PASSWORD || 'admin123'
+    authPassword: process.env.AUTH_PASSWORD || 'admin123',
+    siteLimits
   }
 };
 
