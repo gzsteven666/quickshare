@@ -23,6 +23,8 @@
     }
   ],
   "vars": {
+    "ADMIN_PASSWORD": "test-password",
+    "COOKIE_SIGNING_KEY": "test-cookie-signing-key-32-bytes-long",
     "SITE_PATH_PREFIX": "/s",
     "MAX_FILES": "500",
     "MAX_FILE_BYTES": "8388608",
