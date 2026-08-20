@@ -26,6 +26,13 @@ export interface FileRecord {
   size: number;
   mime_type: string;
   etag: string | null;
+  uploaded_at: number | null;
+}
+
+export interface ManifestFileInput {
+  path: string;
+  size: number;
+  mime_type: string;
 }
 
 export async function createSite(
@@ -74,7 +81,7 @@ export async function getFile(
 
 export async function recordFile(
   db: D1Database,
-  input: Omit<FileRecord, 'etag'> & { etag?: string | null }
+  input: Omit<FileRecord, 'etag' | 'uploaded_at'> & { etag?: string | null }
 ): Promise<void> {
   const version = await getVersionById(db, input.version_id);
   if (!version) throw new DeploymentError('VERSION_NOT_FOUND', '发布版本不存在');
@@ -83,9 +90,61 @@ export async function recordFile(
   }
 
   await db.prepare(
-    `INSERT INTO files (version_id, path, size, mime_type, etag)
-     VALUES (?, ?, ?, ?, ?)`
-  ).bind(input.version_id, input.path, input.size, input.mime_type, input.etag ?? null).run();
+    `INSERT INTO files (version_id, path, size, mime_type, etag, uploaded_at)
+     VALUES (?, ?, ?, ?, ?, ?)`
+  ).bind(
+    input.version_id,
+    input.path,
+    input.size,
+    input.mime_type,
+    input.etag ?? null,
+    Date.now()
+  ).run();
+}
+
+export async function recordManifest(
+  db: D1Database,
+  versionId: string,
+  files: ManifestFileInput[]
+): Promise<void> {
+  const version = await getVersionById(db, versionId);
+  if (!version) throw new DeploymentError('VERSION_NOT_FOUND', '发布版本不存在');
+  if (version.status !== 'uploading') {
+    throw new DeploymentError('VERSION_NOT_UPLOADING', '发布版本已经结束上传');
+  }
+
+  await db.batch(files.map((file) => db.prepare(
+    `INSERT INTO files (version_id, path, size, mime_type, etag, uploaded_at)
+     VALUES (?, ?, ?, ?, NULL, NULL)`
+  ).bind(versionId, file.path, file.size, file.mime_type)));
+}
+
+export async function markFileUploaded(
+  db: D1Database,
+  input: Pick<FileRecord, 'version_id' | 'path' | 'size' | 'mime_type'> & { etag?: string | null },
+  now = Date.now()
+): Promise<void> {
+  const version = await getVersionById(db, input.version_id);
+  if (!version) throw new DeploymentError('VERSION_NOT_FOUND', '发布版本不存在');
+  if (version.status !== 'uploading') {
+    throw new DeploymentError('VERSION_NOT_UPLOADING', '发布版本已经结束上传');
+  }
+
+  const manifestFile = await getFile(db, input.version_id, input.path);
+  if (!manifestFile) {
+    throw new DeploymentError('FILE_NOT_IN_MANIFEST', '文件不在发布清单中');
+  }
+  if (manifestFile.uploaded_at !== null) {
+    throw new DeploymentError('FILE_ALREADY_UPLOADED', '文件已经上传');
+  }
+  if (manifestFile.size !== input.size || manifestFile.mime_type !== input.mime_type) {
+    throw new DeploymentError('FILE_METADATA_MISMATCH', '文件大小或类型与发布清单不一致');
+  }
+
+  await db.prepare(
+    `UPDATE files SET etag = ?, uploaded_at = ?
+     WHERE version_id = ? AND path = ? AND uploaded_at IS NULL`
+  ).bind(input.etag ?? null, now, input.version_id, input.path).run();
 }
 
 export async function finalizeVersion(
@@ -105,7 +164,7 @@ export async function finalizeVersion(
 
   const aggregate = await db.prepare(
     `SELECT COUNT(*) AS file_count, COALESCE(SUM(size), 0) AS total_bytes
-     FROM files WHERE version_id = ?`
+     FROM files WHERE version_id = ? AND uploaded_at IS NOT NULL`
   ).bind(versionId).first<{ file_count: number; total_bytes: number }>();
 
   if (!aggregate || aggregate.file_count !== version.file_count || aggregate.total_bytes !== version.total_bytes) {
