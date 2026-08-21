@@ -2,9 +2,9 @@ import { DeploymentError } from './errors';
 import type { Env } from './env';
 import type { ManifestFileInput } from './repositories/sites';
 
-const DEFAULT_MAX_FILES = 500;
-const DEFAULT_MAX_FILE_BYTES = 8 * 1024 * 1024;
-const DEFAULT_MAX_SITE_BYTES = 30 * 1024 * 1024;
+const DEFAULT_MAX_FILES = 1000;
+const DEFAULT_MAX_FILE_BYTES = 25 * 1024 * 1024;
+const DEFAULT_MAX_SITE_BYTES = 100 * 1024 * 1024;
 const MAX_PATH_LENGTH = 1024;
 const MAX_SLUG_LENGTH = 63;
 const MAX_NAME_LENGTH = 120;

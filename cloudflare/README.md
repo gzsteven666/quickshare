@@ -43,7 +43,7 @@ Copy-Item .dev.vars.example .dev.vars
 5. 全部文件写入后，D1 原子切换 `current_version_id`。
 6. 通过返回的 `/s/<siteId>/` 预览地址打开站点。
 
-首版限制：最多 500 个文件、单文件 8 MB、单站点 30 MB。ZIP 内只允许静态文件，不执行 Node、PHP 或 Python 服务端代码。
+默认限制：最多 1000 个文件、单文件 25 MB、单站点 100 MB。ZIP 内只允许静态文件，不执行 Node、PHP 或 Python 服务端代码。
 
 ## 管理已部署站点
 

@@ -1,7 +1,7 @@
 export const DEFAULT_LIMITS = Object.freeze({
-  maxFiles: 500,
-  maxFileBytes: 8 * 1024 * 1024,
-  maxSiteBytes: 30 * 1024 * 1024
+  maxFiles: 1000,
+  maxFileBytes: 25 * 1024 * 1024,
+  maxSiteBytes: 100 * 1024 * 1024
 });
 
 const MIME_TYPES = {

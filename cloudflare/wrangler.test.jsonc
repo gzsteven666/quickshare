@@ -28,8 +28,8 @@
     "APP_HOST": "quickshare.test",
     "SITES_BASE_DOMAIN": "sites.example.com",
     "SITE_PATH_PREFIX": "/s",
-    "MAX_FILES": "500",
-    "MAX_FILE_BYTES": "8388608",
-    "MAX_SITE_BYTES": "31457280"
+    "MAX_FILES": "1000",
+    "MAX_FILE_BYTES": "26214400",
+    "MAX_SITE_BYTES": "104857600"
   }
 }
