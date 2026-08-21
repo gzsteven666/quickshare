@@ -13,7 +13,8 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "quickshare-db"
+      "database_name": "quickshare-db",
+      "database_id": "6c09d6f0-d11e-4488-a737-9e6b32770dab"
     }
   ],
   "r2_buckets": [
