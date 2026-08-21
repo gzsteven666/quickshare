@@ -10,6 +10,14 @@ export interface SiteRecord {
   updated_at: number;
 }
 
+export interface SiteSummary extends SiteRecord {
+  version_count: number;
+  current_status: VersionRecord['status'] | null;
+  current_file_count: number;
+  current_total_bytes: number;
+  domain_count: number;
+}
+
 export interface VersionRecord {
   id: string;
   site_id: string;
@@ -71,6 +79,24 @@ export async function getSiteByHostname(db: D1Database, hostname: string): Promi
      INNER JOIN domains ON domains.site_id = sites.id
      WHERE domains.hostname = ?`
   ).bind(hostname).first<SiteRecord>();
+}
+
+export async function listSiteSummaries(db: D1Database): Promise<SiteSummary[]> {
+  const result = await db.prepare(
+    `SELECT sites.*,
+       COUNT(DISTINCT versions.id) AS version_count,
+       current_version.status AS current_status,
+       COALESCE(current_version.file_count, 0) AS current_file_count,
+       COALESCE(current_version.total_bytes, 0) AS current_total_bytes,
+       COUNT(DISTINCT domains.hostname) AS domain_count
+     FROM sites
+     LEFT JOIN versions ON versions.site_id = sites.id
+     LEFT JOIN versions AS current_version ON current_version.id = sites.current_version_id
+     LEFT JOIN domains ON domains.site_id = sites.id
+     GROUP BY sites.id
+     ORDER BY sites.updated_at DESC`
+  ).all<SiteSummary>();
+  return result.results;
 }
 
 export async function getVersionById(db: D1Database, versionId: string): Promise<VersionRecord | null> {
@@ -189,4 +215,20 @@ export async function finalizeVersion(
        WHERE id = ?`
     ).bind(versionId, entryPath, now, siteId)
   ]);
+}
+
+export async function deleteSiteRecords(db: D1Database, siteId: string): Promise<boolean> {
+  const site = await getSiteById(db, siteId);
+  if (!site) return false;
+
+  await db.batch([
+    db.prepare(
+      `DELETE FROM files
+       WHERE version_id IN (SELECT id FROM versions WHERE site_id = ?)`
+    ).bind(siteId),
+    db.prepare('DELETE FROM versions WHERE site_id = ?').bind(siteId),
+    db.prepare('DELETE FROM domains WHERE site_id = ?').bind(siteId),
+    db.prepare('DELETE FROM sites WHERE id = ?').bind(siteId)
+  ]);
+  return true;
 }

@@ -45,6 +45,15 @@ Copy-Item .dev.vars.example .dev.vars
 
 首版限制：最多 500 个文件、单文件 8 MB、单站点 30 MB。ZIP 内只允许静态文件，不执行 Node、PHP 或 Python 服务端代码。
 
+## 管理已部署站点
+
+登录控制台后，`已部署的网站` 区域会列出站点名称、slug、当前版本、文件数、入口文件、绑定域名和预览地址。点击“删除站点”并确认后，Worker 会依次清理：
+
+- R2 中 `sites/<siteId>/` 下的全部版本对象；
+- D1 中该站点的文件、版本、域名映射和站点记录。
+
+如果 R2 清理失败，D1 元数据会保留，方便重试。删除不会修改 Cloudflare DNS、Custom Domain 或 Worker Route，需要在 Dashboard 中单独处理路由。
+
 ## 自定义域名
 
 控制台可以记录一个域名到站点的映射，但不会保存 Cloudflare API Token，也不会自动修改 DNS。添加映射后按界面指引在 Cloudflare Dashboard 完成一次绑定：

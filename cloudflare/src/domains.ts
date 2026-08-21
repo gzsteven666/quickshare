@@ -33,6 +33,13 @@ export async function listDomains(db: D1Database, siteId: string): Promise<Domai
   return result.results;
 }
 
+export async function listAllDomains(db: D1Database): Promise<DomainRecord[]> {
+  const result = await db.prepare(
+    `SELECT hostname, site_id, created_at FROM domains ORDER BY hostname ASC`
+  ).all<DomainRecord>();
+  return result.results;
+}
+
 export async function createDomainMapping(
   db: D1Database,
   siteId: string,

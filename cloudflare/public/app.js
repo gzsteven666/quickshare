@@ -37,6 +37,9 @@ const hostnameInput = $('hostname');
 const domainError = $('domainError');
 const domainList = $('domainList');
 const domainInstructions = $('domainInstructions');
+const refreshSitesButton = $('refreshSitesButton');
+const sitesSummary = $('sitesSummary');
+const sitesList = $('sitesList');
 
 function formatBytes(bytes) {
   if (bytes < 1024) return `${bytes} B`;
@@ -198,6 +201,7 @@ async function deployArchive() {
     resultSummary.textContent = `${manifest.files.length} 个文件已发布，入口文件为 ${manifest.entryPath}。`;
     resultPanel.hidden = false;
     domainPanel.hidden = false;
+    await loadSites();
     await loadDomains();
     archiveStatus.textContent = '已发布';
     setProgress(manifest.totalBytes, manifest.totalBytes, '发布完成');
@@ -293,6 +297,102 @@ async function loadDomains() {
   }
 }
 
+function siteStatusLabel(status) {
+  if (status === 'ready') return '已发布';
+  if (status === 'uploading') return '上传中';
+  if (status === 'failed') return '失败';
+  return '未发布';
+}
+
+function formatSiteDate(timestamp) {
+  if (!timestamp) return '—';
+  return new Date(timestamp).toLocaleString('zh-CN', { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+function renderSites(sites) {
+  sitesList.replaceChildren();
+  sitesSummary.textContent = sites.length ? `共 ${sites.length} 个站点` : '还没有部署站点。';
+  if (!sites.length) return;
+
+  for (const site of sites) {
+    const card = document.createElement('article');
+    card.className = 'site-card';
+
+    const header = document.createElement('div');
+    header.className = 'site-card-header';
+    const titleBlock = document.createElement('div');
+    const title = document.createElement('h3');
+    title.textContent = site.name;
+    const slug = document.createElement('p');
+    slug.className = 'site-slug';
+    slug.textContent = site.slug;
+    titleBlock.append(title, slug);
+    const status = document.createElement('span');
+    status.className = `site-status ${site.currentStatus || ''}`;
+    status.textContent = siteStatusLabel(site.currentStatus);
+    header.append(titleBlock, status);
+
+    const meta = document.createElement('div');
+    meta.className = 'site-meta';
+    meta.append(
+      document.createTextNode(`${site.currentFileCount || 0} 个文件`),
+      document.createTextNode(`版本 ${site.versionCount || 0}`),
+      document.createTextNode(`入口：${site.entryPath}`),
+      document.createTextNode(`更新于 ${formatSiteDate(site.updatedAt)}`)
+    );
+
+    const domains = document.createElement('div');
+    domains.className = 'site-domains';
+    domains.textContent = site.domains?.length ? `域名：${site.domains.join('、')}` : '尚未绑定自定义域名';
+
+    const actions = document.createElement('div');
+    actions.className = 'site-card-actions';
+    if (site.currentVersionId) {
+      const preview = document.createElement('a');
+      preview.href = new URL(site.previewUrl, location.origin).href;
+      preview.target = '_blank';
+      preview.rel = 'noopener noreferrer';
+      preview.textContent = '打开预览';
+      actions.append(preview);
+    }
+    const remove = document.createElement('button');
+    remove.className = 'danger-button';
+    remove.type = 'button';
+    remove.textContent = '删除站点';
+    remove.addEventListener('click', async () => {
+      if (!window.confirm(`确定删除“${site.name}”吗？\n\n这会删除该站点的所有版本、R2 文件和域名映射，且无法恢复。`)) return;
+      remove.disabled = true;
+      remove.textContent = '删除中…';
+      try {
+        await apiRequest(`/api/sites/${encodeURIComponent(site.siteId)}`, { method: 'DELETE' });
+        if (state.siteId === site.siteId) {
+          state.siteId = '';
+          domainPanel.hidden = true;
+        }
+        await loadSites();
+      } catch (error) {
+        remove.disabled = false;
+        remove.textContent = '删除站点';
+        window.alert(error instanceof Error ? error.message : '删除失败。');
+      }
+    });
+    actions.append(remove);
+    card.append(header, meta, domains, actions);
+    sitesList.append(card);
+  }
+}
+
+async function loadSites() {
+  sitesSummary.textContent = '正在读取站点列表…';
+  try {
+    const data = await apiRequest('/api/sites');
+    renderSites(data.sites || []);
+  } catch (error) {
+    sitesSummary.textContent = error instanceof Error ? error.message : '站点列表读取失败。';
+    sitesList.replaceChildren();
+  }
+}
+
 loginForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   setMessage(loginError, '');
@@ -302,6 +402,7 @@ loginForm.addEventListener('submit', async (event) => {
       body: JSON.stringify({ password: passwordInput.value })
     });
     showApp(true);
+    void loadSites();
   } catch (error) {
     setMessage(loginError, error instanceof Error ? error.message : '登录失败。');
   }
@@ -339,6 +440,7 @@ dropzone.addEventListener('drop', (event) => {
 zipInput.addEventListener('change', () => chooseZip(zipInput.files[0]));
 deployButton.addEventListener('click', () => void deployArchive());
 clearButton.addEventListener('click', resetArchive);
+refreshSitesButton.addEventListener('click', () => void loadSites());
 domainForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   if (!state.siteId) return;
@@ -370,6 +472,7 @@ void (async () => {
   try {
     const session = await apiRequest('/api/auth/me');
     showApp(session.authenticated === true);
+    if (session.authenticated === true) void loadSites();
   } catch {
     showApp(false);
   }

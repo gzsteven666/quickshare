@@ -5,6 +5,7 @@ import { isManagementHost, isSiteRequestHost, requestHostname, resolveSiteByHost
 import { authRoutes } from './routes/auth';
 import { domainRoutes } from './routes/domains';
 import { deploymentRoutes } from './routes/deployments';
+import { siteRoutes } from './routes/sites';
 import { serveSite } from './site-responder';
 
 const app = new Hono<{ Bindings: Env }>();
@@ -22,6 +23,7 @@ app.get('/api/health', (c) => c.json({
 app.route('/api/auth', authRoutes);
 app.route('/api/deployments', deploymentRoutes);
 app.route('/api/domains', domainRoutes);
+app.route('/api/sites', siteRoutes);
 
 app.all('*', async (c) => {
   const pathPrefix = (c.env.SITE_PATH_PREFIX || '/s').replace(/\/$/, '');

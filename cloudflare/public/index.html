@@ -39,6 +39,18 @@
           <button id="logoutButton" class="quiet-button" type="button">退出</button>
         </div>
 
+        <section id="sitesPanel" class="panel sites-panel">
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">MANAGE SITES</p>
+              <h2>已部署的网站</h2>
+            </div>
+            <button id="refreshSitesButton" class="quiet-button" type="button">刷新</button>
+          </div>
+          <p id="sitesSummary" class="summary">正在读取站点列表…</p>
+          <div id="sitesList" class="sites-list"></div>
+        </section>
+
         <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="拖入 ZIP 文件或选择文件">
           <input id="zipInput" type="file" accept=".zip,application/zip" hidden>
           <div class="drop-icon">↓</div>
