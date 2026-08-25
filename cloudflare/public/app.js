@@ -356,7 +356,20 @@ function renderSites(sites) {
       const exportLink = document.createElement('a');
       exportLink.href = `/api/sites/${encodeURIComponent(site.siteId)}/export`;
       exportLink.textContent = '导出 ZIP';
-      actions.append(preview, exportLink);
+      const manageDomains = document.createElement('button');
+      manageDomains.className = 'site-card-link-button';
+      manageDomains.type = 'button';
+      manageDomains.textContent = site.domains?.length ? '管理域名' : '绑定域名';
+      manageDomains.addEventListener('click', () => {
+        state.siteId = site.siteId;
+        setMessage(domainError, '');
+        domainInstructions.hidden = true;
+        domainPanel.hidden = false;
+        void loadDomains();
+        domainPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        hostnameInput.focus({ preventScroll: true });
+      });
+      actions.append(preview, exportLink, manageDomains);
     }
     const remove = document.createElement('button');
     remove.className = 'danger-button';

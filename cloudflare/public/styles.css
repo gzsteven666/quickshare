@@ -73,7 +73,8 @@ input:focus { border-color: var(--accent); box-shadow: 0 0 0 4px var(--soft-acce
 .site-meta { display: flex; flex-wrap: wrap; gap: 7px 14px; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .site-domains { color: var(--muted); font-size: 12px; }
 .site-card-actions { display: flex; align-items: center; gap: 12px; }
-.site-card-actions a { color: var(--accent-dark); font-size: 13px; font-weight: 700; text-decoration: none; }
+.site-card-actions a, .site-card-link-button { color: var(--accent-dark); font-size: 13px; font-weight: 700; text-decoration: none; }
+.site-card-link-button { border: 0; padding: 0; background: transparent; cursor: pointer; }
 .danger-button { border: 0; padding: 0; color: #b13a2a; background: transparent; cursor: pointer; font-size: 13px; font-weight: 700; }
 .danger-button:hover { color: #812417; text-decoration: underline; text-underline-offset: 3px; }
 .archive-panel, .result-panel { padding: clamp(22px, 5vw, 38px); }
