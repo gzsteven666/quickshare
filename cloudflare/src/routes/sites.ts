@@ -9,8 +9,11 @@ import { deleteSiteObjects } from '../storage';
 import {
   deleteSiteRecords,
   getSiteById,
+  getVersionById,
+  listUploadedFiles,
   listSiteSummaries
 } from '../repositories/sites';
+import { createSiteArchive } from '../site-export';
 
 export const siteRoutes = new Hono<{ Bindings: Env }>();
 
@@ -64,6 +67,37 @@ siteRoutes.get('/', async (c) => {
         updatedAt: site.updated_at,
         previewUrl: previewUrl(site.id, c.env)
       }))
+    });
+  } catch (error) {
+    return errorResponse(c, error);
+  }
+});
+
+siteRoutes.get('/:siteId/export', async (c) => {
+  const unauthorized = await requireAdmin(c.req.raw, c.env);
+  if (unauthorized) return unauthorized;
+
+  try {
+    const site = await getSiteById(c.env.DB, c.req.param('siteId'));
+    if (!site?.current_version_id) {
+      throw new DeploymentError('SITE_NOT_FOUND', '站点尚未发布');
+    }
+    const version = await getVersionById(c.env.DB, site.current_version_id);
+    if (!version || version.status !== 'ready') {
+      throw new DeploymentError('SITE_NOT_FOUND', '站点尚未发布');
+    }
+    const files = await listUploadedFiles(c.env.DB, version.id);
+    if (files.length === 0) {
+      throw new DeploymentError('SITE_NOT_FOUND', '站点尚未发布');
+    }
+
+    return new Response(createSiteArchive(c.env.SITES, site.id, version.id, files), {
+      headers: {
+        'Content-Type': 'application/zip',
+        'Content-Disposition': `attachment; filename="${site.slug}.zip"`,
+        'Cache-Control': 'no-store',
+        'X-Content-Type-Options': 'nosniff'
+      }
     });
   } catch (error) {
     return errorResponse(c, error);

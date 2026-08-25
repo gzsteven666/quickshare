@@ -353,7 +353,10 @@ function renderSites(sites) {
       preview.target = '_blank';
       preview.rel = 'noopener noreferrer';
       preview.textContent = '打开预览';
-      actions.append(preview);
+      const exportLink = document.createElement('a');
+      exportLink.href = `/api/sites/${encodeURIComponent(site.siteId)}/export`;
+      exportLink.textContent = '导出 ZIP';
+      actions.append(preview, exportLink);
     }
     const remove = document.createElement('button');
     remove.className = 'danger-button';

@@ -113,6 +113,13 @@ export async function getFile(
   ).bind(versionId, filePath).first<FileRecord>();
 }
 
+export async function listUploadedFiles(db: D1Database, versionId: string): Promise<FileRecord[]> {
+  const result = await db.prepare(
+    'SELECT * FROM files WHERE version_id = ? AND uploaded_at IS NOT NULL ORDER BY path ASC'
+  ).bind(versionId).all<FileRecord>();
+  return result.results;
+}
+
 export async function recordFile(
   db: D1Database,
   input: Omit<FileRecord, 'etag' | 'uploaded_at'> & { etag?: string | null }

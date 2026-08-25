@@ -1,4 +1,5 @@
 import { env, SELF } from 'cloudflare:test';
+import { BlobReader, TextWriter, ZipReader } from '@zip.js/zip.js';
 import type { Env } from '../src/env';
 import {
   createSite,
@@ -70,6 +71,20 @@ describe('site management API', () => {
       }]
     });
 
+    const exported = await SELF.fetch(`https://quickshare.test/api/sites/${siteId}/export`, {
+      headers: { Cookie: cookie }
+    });
+    expect(exported.status).toBe(200);
+    expect(exported.headers.get('Content-Type')).toBe('application/zip');
+    expect(exported.headers.get('Content-Disposition')).toBe('attachment; filename="managed-site.zip"');
+    const archive = new ZipReader(new BlobReader(await exported.blob()));
+    const entries = await archive.getEntries();
+    expect(entries).toHaveLength(1);
+    const [entry] = entries;
+    if (entry.directory) throw new Error('导出包不应包含目录条目');
+    await expect(entry.getData(new TextWriter())).resolves.toBe(body);
+    await archive.close();
+
     const deleted = await SELF.fetch(`https://quickshare.test/api/sites/${siteId}`, {
       method: 'DELETE',
       headers: { Cookie: cookie, Origin: 'https://quickshare.test' }
@@ -93,5 +108,8 @@ describe('site management API', () => {
       headers: { Origin: 'https://quickshare.test' }
     });
     expect(response.status).toBe(401);
+
+    const exportResponse = await SELF.fetch('https://quickshare.test/api/sites/missing-site/export');
+    expect(exportResponse.status).toBe(401);
   });
 });
