@@ -87,6 +87,15 @@ describe('R2 site responder', () => {
       ]
     });
 
+    const trailingSlash = await SELF.fetch(
+      'https://quickshare.test/s/site-nested?from=wechat',
+      { redirect: 'manual' }
+    );
+    expect(trailingSlash.status).toBe(308);
+    expect(trailingSlash.headers.get('Location')).toBe(
+      'https://quickshare.test/s/site-nested/?from=wechat'
+    );
+
     const redirect = await SELF.fetch('https://nested-site.sites.example.com/', { redirect: 'manual' });
     expect(redirect.status).toBe(302);
     expect(redirect.headers.get('Location')).toBe('https://nested-site.sites.example.com/docs/index.html');

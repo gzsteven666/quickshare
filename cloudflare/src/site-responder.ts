@@ -51,7 +51,10 @@ export async function serveSite(
 
   const url = new URL(request.url);
   const relativePath = requestRelativePath(url.pathname, site.id, env, options.preview === true);
-  if (relativePath === null && !url.pathname.endsWith('/')) return notFound();
+  if (relativePath === null && !url.pathname.endsWith('/')) {
+    url.pathname = `${url.pathname}/`;
+    return Response.redirect(url, 308);
+  }
 
   let filePath: string;
   try {
