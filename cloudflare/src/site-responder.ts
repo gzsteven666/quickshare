@@ -31,6 +31,10 @@ function notFound(): Response {
   return new Response('Not Found', { status: 404 });
 }
 
+function isHumanAtlasFile(filePath: string): boolean {
+  return filePath === 'public/human-atlas/index.html' || filePath.startsWith('public/human-atlas/');
+}
+
 export async function serveSite(
   request: Request,
   env: Env,
@@ -91,6 +95,12 @@ export async function serveSite(
   }
   if (options.preview) {
     headers.set('Content-Security-Policy', 'sandbox allow-scripts');
+    // Preview pages have an opaque origin because of the sandbox. Human Atlas loads
+    // module, stylesheet, and model files from its own shared directory, so those
+    // responses need explicit CORS permission while the sandbox remains intact.
+    if (isHumanAtlasFile(filePath)) {
+      headers.set('Access-Control-Allow-Origin', '*');
+    }
   }
 
   return new Response(request.method === 'HEAD' ? null : object.body, {

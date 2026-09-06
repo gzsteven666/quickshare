@@ -109,6 +109,32 @@ describe('R2 site responder', () => {
     expect(siteHostPreview.status).toBe(404);
   });
 
+  it('allows Human Atlas preview assets to load without weakening the preview sandbox', async () => {
+    await seedSite({
+      id: 'site-human-atlas',
+      slug: 'human-atlas',
+      entryPath: 'public/human-atlas/index.html',
+      files: [
+        { path: 'public/human-atlas/index.html', body: '<div id="root"></div>', mimeType: 'text/html; charset=utf-8' },
+        { path: 'public/human-atlas/assets/app.js', body: 'console.log(1);', mimeType: 'text/javascript; charset=utf-8' },
+        { path: 'public/human-atlas/assets/app.css', body: 'body{}', mimeType: 'text/css; charset=utf-8' },
+        { path: 'public/human-atlas/models/atlas.json', body: '{}', mimeType: 'application/json; charset=utf-8' }
+      ]
+    });
+
+    for (const path of [
+      'public/human-atlas/index.html',
+      'public/human-atlas/assets/app.js',
+      'public/human-atlas/assets/app.css',
+      'public/human-atlas/models/atlas.json'
+    ]) {
+      const response = await SELF.fetch(`https://quickshare.test/s/site-human-atlas/${path}`);
+      expect(response.status).toBe(200);
+      expect(response.headers.get('Content-Security-Policy')).toBe('sandbox allow-scripts');
+      expect(response.headers.get('Access-Control-Allow-Origin')).toBe('*');
+    }
+  });
+
   it('does not expose an unknown wildcard hostname', async () => {
     const response = await SELF.fetch('https://missing.sites.example.com/');
     expect(response.status).toBe(404);
