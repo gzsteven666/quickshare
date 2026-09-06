@@ -74,6 +74,29 @@ describe('deployment upload API', () => {
     expect(unknownFile.status).toBe(404);
   });
 
+  it('creates a new version for an existing slug without changing its site URL', async () => {
+    const cookie = await adminCookie();
+    const first = await SELF.fetch('https://quickshare.test/api/deployments', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify(manifest({ slug: 'update-site' }))
+    });
+    const firstDeployment = await first.json() as { siteId: string; versionId: string; previewUrl: string };
+
+    const second = await SELF.fetch('https://quickshare.test/api/deployments', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify(manifest({ slug: 'update-site' }))
+    });
+    const secondDeployment = await second.json() as { siteId: string; versionId: string; previewUrl: string };
+
+    expect(first.status).toBe(201);
+    expect(second.status).toBe(201);
+    expect(secondDeployment.siteId).toBe(firstDeployment.siteId);
+    expect(secondDeployment.previewUrl).toBe(firstDeployment.previewUrl);
+    expect(secondDeployment.versionId).not.toBe(firstDeployment.versionId);
+  });
+
   it('writes R2 objects and atomically publishes a complete version', async () => {
     const cookie = await adminCookie();
     const create = await SELF.fetch('https://quickshare.test/api/deployments', {

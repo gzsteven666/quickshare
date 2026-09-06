@@ -1,7 +1,7 @@
 import { buildZipManifest, DEFAULT_LIMITS } from './app-core.js';
 
 const zipLib = globalThis.zip;
-const state = { archive: null, busy: false, previewUrl: '', siteId: '' };
+const state = { archive: null, busy: false, previewUrl: '', siteId: '', updateTarget: null };
 
 const $ = (id) => document.getElementById(id);
 const loginView = $('loginView');
@@ -82,6 +82,12 @@ function slugFromFilename(filename) {
   return slug || `site-${Date.now().toString(36)}`;
 }
 
+function openZipPicker(site = null) {
+  state.updateTarget = site;
+  zipInput.value = '';
+  zipInput.click();
+}
+
 function chooseZip(file) {
   if (!file) return;
   if (!/\.zip$/i.test(file.name) && file.type !== 'application/zip') {
@@ -96,8 +102,10 @@ async function inspectZip(file) {
     setMessage(deployError, 'ZIP 解析组件未加载，请刷新页面重试。');
     return;
   }
+  const updateTarget = state.updateTarget;
   resetArchive();
-  archiveName.textContent = file.name;
+  state.updateTarget = updateTarget;
+  archiveName.textContent = updateTarget ? `更新 ${updateTarget.name}` : file.name;
   archiveStatus.textContent = '读取中';
   archivePanel.hidden = false;
   setMessage(deployError, '');
@@ -108,8 +116,11 @@ async function inspectZip(file) {
     state.archive = { file, reader, manifest };
     archiveStatus.textContent = '已读取';
     fileSummary.textContent = `${manifest.files.length} 个文件 · ${formatBytes(manifest.totalBytes)} · 入口：${manifest.entryPath}`;
-    siteNameInput.value = file.name.replace(/\.zip$/i, '');
-    siteSlugInput.value = slugFromFilename(file.name);
+    siteNameInput.value = updateTarget?.name || file.name.replace(/\.zip$/i, '');
+    siteSlugInput.value = updateTarget?.slug || slugFromFilename(file.name);
+    siteNameInput.readOnly = Boolean(updateTarget);
+    siteSlugInput.readOnly = Boolean(updateTarget);
+    deployButton.textContent = updateTarget ? '更新现有站点' : '发布站点';
     resultPanel.hidden = true;
   } catch (error) {
     archiveStatus.textContent = '读取失败';
@@ -198,7 +209,9 @@ async function deployArchive() {
     previewLink.href = state.previewUrl;
     previewLink.textContent = state.previewUrl;
     openButton.href = state.previewUrl;
-    resultSummary.textContent = `${manifest.files.length} 个文件已发布，入口文件为 ${manifest.entryPath}。`;
+    resultSummary.textContent = state.updateTarget
+      ? `${manifest.files.length} 个文件已更新，原预览网址保持不变。`
+      : `${manifest.files.length} 个文件已发布，入口文件为 ${manifest.entryPath}。`;
     resultPanel.hidden = false;
     domainPanel.hidden = false;
     await loadSites();
@@ -230,6 +243,10 @@ function resetArchive() {
   domainInstructions.hidden = true;
   progressArea.hidden = true;
   zipInput.value = '';
+  siteNameInput.readOnly = false;
+  siteSlugInput.readOnly = false;
+  deployButton.textContent = '发布站点';
+  state.updateTarget = null;
   setMessage(deployError, '');
   progressBar.style.width = '0%';
 }
@@ -348,6 +365,11 @@ function renderSites(sites) {
     const actions = document.createElement('div');
     actions.className = 'site-card-actions';
     if (site.currentVersionId) {
+      const update = document.createElement('button');
+      update.className = 'site-card-link-button';
+      update.type = 'button';
+      update.textContent = '更新 ZIP';
+      update.addEventListener('click', () => openZipPicker(site));
       const preview = document.createElement('a');
       preview.href = new URL(site.previewUrl, location.origin).href;
       preview.target = '_blank';
@@ -369,7 +391,7 @@ function renderSites(sites) {
         domainPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
         hostnameInput.focus({ preventScroll: true });
       });
-      actions.append(preview, exportLink, manageDomains);
+      actions.append(update, preview, exportLink, manageDomains);
     }
     const remove = document.createElement('button');
     remove.className = 'danger-button';
@@ -432,15 +454,15 @@ logoutButton.addEventListener('click', async () => {
 
 chooseButton.addEventListener('click', (event) => {
   event.stopPropagation();
-  zipInput.click();
+  openZipPicker();
 });
 dropzone.addEventListener('click', (event) => {
-  if (!event.target.closest('button')) zipInput.click();
+  if (!event.target.closest('button')) openZipPicker();
 });
 dropzone.addEventListener('keydown', (event) => {
   if (event.key === 'Enter' || event.key === ' ') {
     event.preventDefault();
-    zipInput.click();
+    openZipPicker();
   }
 });
 dropzone.addEventListener('dragover', (event) => {
@@ -451,6 +473,7 @@ dropzone.addEventListener('dragleave', () => dropzone.classList.remove('is-dragg
 dropzone.addEventListener('drop', (event) => {
   event.preventDefault();
   dropzone.classList.remove('is-dragging');
+  state.updateTarget = null;
   chooseZip(event.dataTransfer.files[0]);
 });
 zipInput.addEventListener('change', () => chooseZip(zipInput.files[0]));
