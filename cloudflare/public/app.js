@@ -476,6 +476,8 @@ dropzone.addEventListener('drop', (event) => {
   state.updateTarget = null;
   chooseZip(event.dataTransfer.files[0]);
 });
+// The picker lives inside the new-site dropzone; its click must not reset the update target.
+zipInput.addEventListener('click', (event) => event.stopPropagation());
 zipInput.addEventListener('change', () => chooseZip(zipInput.files[0]));
 deployButton.addEventListener('click', () => void deployArchive());
 clearButton.addEventListener('click', resetArchive);
