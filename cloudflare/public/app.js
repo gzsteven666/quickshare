@@ -1,4 +1,4 @@
-import { buildZipManifest, DEFAULT_LIMITS } from './app-core.js';
+import { buildZipManifest, buildHtmlManifest, DEFAULT_LIMITS } from './app-core.js';
 
 const zipLib = globalThis.zip;
 const state = { archive: null, busy: false, previewUrl: '', siteId: '', updateTarget: null };
@@ -83,6 +83,7 @@ function slugFromFilename(filename) {
 }
 
 function openZipPicker(site = null) {
+  if (state.busy) return;
   state.updateTarget = site;
   zipInput.value = '';
   zipInput.click();
@@ -98,6 +99,7 @@ function chooseZip(file) {
 }
 
 async function inspectZip(file) {
+  if (state.busy) return;
   if (!zipLib) {
     setMessage(deployError, 'ZIP 解析组件未加载，请刷新页面重试。');
     return;
@@ -140,7 +142,7 @@ async function uploadEntry(entry, created, onComplete) {
   let lastError;
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
-      const blob = await entry.entry.getData(new zipLib.BlobWriter(entry.mimeType));
+      const blob = entry.blob || await entry.entry.getData(new zipLib.BlobWriter(entry.mimeType));
       const path = new URL(`/api/deployments/${encodeURIComponent(created.versionId)}/files`, location.origin);
       path.searchParams.set('path', entry.path);
       await apiRequest(path, {
@@ -473,6 +475,7 @@ dropzone.addEventListener('dragleave', () => dropzone.classList.remove('is-dragg
 dropzone.addEventListener('drop', (event) => {
   event.preventDefault();
   dropzone.classList.remove('is-dragging');
+  if (state.busy) return;
   state.updateTarget = null;
   chooseZip(event.dataTransfer.files[0]);
 });
@@ -481,6 +484,25 @@ zipInput.addEventListener('click', (event) => event.stopPropagation());
 zipInput.addEventListener('change', () => chooseZip(zipInput.files[0]));
 deployButton.addEventListener('click', () => void deployArchive());
 clearButton.addEventListener('click', resetArchive);
+$('prepareHtmlButton').addEventListener('click', () => {
+  if (state.busy) return;
+  setMessage($('htmlError'), '');
+  try {
+    const manifest = buildHtmlManifest($('htmlCode').value);
+    resetArchive();
+    state.archive = { manifest };
+    archiveName.textContent = 'HTML 单页';
+    archiveStatus.textContent = '已读取';
+    fileSummary.textContent = `1 个文件 · ${formatBytes(manifest.totalBytes)} · 入口：index.html`;
+    siteNameInput.value = 'HTML 页面';
+    siteSlugInput.value = `html-${Date.now().toString(36)}`;
+    archivePanel.hidden = false;
+    archivePanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    siteNameInput.focus();
+  } catch (error) {
+    setMessage($('htmlError'), error instanceof Error ? error.message : 'HTML 无法读取。');
+  }
+});
 refreshSitesButton.addEventListener('click', () => void loadSites());
 domainForm.addEventListener('submit', async (event) => {
   event.preventDefault();

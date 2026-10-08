@@ -47,6 +47,8 @@ Copy-Item .dev.vars.example .dev.vars
 
 ## 管理已部署站点
 
+也可以在控制台的“粘贴 HTML 代码”区域输入单页代码，点击“使用这段 HTML”，填写名称和 slug 后发布。内容以 UTF-8 保存为 `index.html`，沿用单文件大小限制。CSS/JavaScript 可内嵌，外部图片等资源需要可访问的 URL；多文件项目仍使用 ZIP 上传。
+
 登录控制台后，`已部署的网站` 区域会列出站点名称、slug、当前版本、文件数、入口文件、绑定域名和预览地址。点击“删除站点”并确认后，Worker 会依次清理：
 
 - R2 中 `sites/<siteId>/` 下的全部版本对象；

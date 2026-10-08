@@ -19,7 +19,7 @@
 
       <section id="loginView" class="panel login-panel">
         <p class="eyebrow">STATIC SITE DROP</p>
-        <h1>把 ZIP 拖进来，发布一个站点。</h1>
+        <h1>上传 ZIP 或粘贴 HTML，发布一个站点。</h1>
         <p class="lede">QuickShare 会在浏览器中读取压缩包，只上传静态文件到 Cloudflare R2。</p>
         <form id="loginForm" class="stack-form">
           <label for="password">管理员密码</label>
@@ -59,6 +59,17 @@
           <p class="drop-hint">限制：最多 1000 个文件，单文件 25 MB，站点 100 MB</p>
         </div>
 
+        <section class="panel">
+          <h2>粘贴 HTML 代码</h2>
+          <p class="summary">适合单页网站。CSS 和 JavaScript 可写在 HTML 内；图片等资源请使用可访问的网址。多文件网站请上传 ZIP。</p>
+          <label for="htmlCode">HTML 代码</label>
+          <textarea id="htmlCode" rows="12" spellcheck="false" placeholder="<!doctype html>…"></textarea>
+          <div class="actions">
+            <button id="prepareHtmlButton" class="primary-button" type="button">使用这段 HTML</button>
+          </div>
+          <p id="htmlError" class="form-error" role="alert" hidden></p>
+        </section>
+
         <section id="archivePanel" class="panel archive-panel" hidden>
           <div class="section-title">
             <div>
@@ -80,7 +91,7 @@
           </div>
           <div class="actions">
             <button id="deployButton" class="primary-button" type="button">开始发布</button>
-            <button id="clearButton" class="quiet-button" type="button">换一个 ZIP</button>
+            <button id="clearButton" class="quiet-button" type="button">取消本次发布</button>
           </div>
           <div id="progressArea" class="progress-area" hidden>
             <div class="progress-label"><span id="progressText">准备上传…</span><span id="progressPercent">0%</span></div>

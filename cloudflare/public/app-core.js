@@ -4,6 +4,18 @@ export const DEFAULT_LIMITS = Object.freeze({
   maxSiteBytes: 100 * 1024 * 1024
 });
 
+export function buildHtmlManifest(html, limits = DEFAULT_LIMITS) {
+  if (!html.trim()) throw new Error('请先粘贴 HTML 代码。');
+  const blob = new Blob([html], { type: 'text/html; charset=utf-8' });
+  if (blob.size > limits.maxFileBytes || blob.size > limits.maxSiteBytes) {
+    throw new Error('HTML 大小超过上传限制。');
+  }
+  return {
+    entryPath: 'index.html', totalBytes: blob.size,
+    files: [{ path: 'index.html', size: blob.size, mimeType: blob.type, blob }]
+  };
+}
+
 const MIME_TYPES = {
   html: 'text/html; charset=utf-8',
   htm: 'text/html; charset=utf-8',
