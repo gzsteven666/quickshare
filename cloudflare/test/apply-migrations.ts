@@ -13,6 +13,7 @@ beforeEach(async () => {
     testEnv.DB.prepare('DELETE FROM files'),
     testEnv.DB.prepare('DELETE FROM versions'),
     testEnv.DB.prepare('DELETE FROM domains'),
-    testEnv.DB.prepare('DELETE FROM sites')
+    testEnv.DB.prepare('DELETE FROM sites'),
+    testEnv.DB.prepare("UPDATE operation_budgets SET reserved_bytes = 0, day = '', writes = 0, export_reads = 0")
   ]);
 });

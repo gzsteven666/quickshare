@@ -14,11 +14,13 @@ import {
   listSiteSummaries
 } from '../repositories/sites';
 import { createSiteArchive } from '../site-export';
+import { claimOperations } from '../cost-controls';
 
 export const siteRoutes = new Hono<{ Bindings: Env }>();
 
 function errorStatus(error: DeploymentError): ContentfulStatusCode {
   if (error.code === 'SITE_NOT_FOUND') return 404;
+  if (error.code === 'DAILY_OPERATION_LIMIT') return 429;
   return 400;
 }
 
@@ -91,6 +93,7 @@ siteRoutes.get('/:siteId/export', async (c) => {
       throw new DeploymentError('SITE_NOT_FOUND', '站点尚未发布');
     }
 
+    await claimOperations(c.env.DB, 'export_reads', files.length);
     return new Response(createSiteArchive(c.env.SITES, site.id, version.id, files), {
       headers: {
         'Content-Type': 'application/zip',

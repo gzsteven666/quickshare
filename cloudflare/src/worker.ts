@@ -7,8 +7,15 @@ import { domainRoutes } from './routes/domains';
 import { deploymentRoutes } from './routes/deployments';
 import { siteRoutes } from './routes/sites';
 import { serveSite } from './site-responder';
+import { rateLimit } from './cost-controls';
 
 const app = new Hono<{ Bindings: Env }>();
+
+app.use('*', async (c, next) => {
+  const limited = await rateLimit(c.req.raw, c.env);
+  if (limited) return limited;
+  await next();
+});
 
 app.use('/api/*', async (c, next) => {
   if (await isSiteRequestHost(c.env.DB, c.req.raw, c.env)) return c.notFound();
@@ -34,13 +41,13 @@ app.all('*', async (c) => {
     if (!siteId || siteId.includes('%')) return c.notFound();
     const site = await getSiteById(c.env.DB, decodeURIComponent(siteId));
     if (!site) return c.notFound();
-    return serveSite(c.req.raw, c.env, site, { preview: true });
+    return serveSite(c.req.raw, c.env, site, { preview: true, waitUntil: c.executionCtx.waitUntil.bind(c.executionCtx) });
   }
 
   if (await isSiteRequestHost(c.env.DB, c.req.raw, c.env)) {
     const site = await resolveSiteByHost(c.env.DB, requestHostname(c.req.raw), c.env);
     if (!site) return c.notFound();
-    return serveSite(c.req.raw, c.env, site);
+    return serveSite(c.req.raw, c.env, site, { waitUntil: c.executionCtx.waitUntil.bind(c.executionCtx) });
   }
 
   return c.env.ASSETS.fetch(c.req.raw);

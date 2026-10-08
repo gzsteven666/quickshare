@@ -33,8 +33,15 @@
     "SITE_PATH_PREFIX": "/s",
     "MAX_FILES": "1000",
     "MAX_FILE_BYTES": "26214400",
-    "MAX_SITE_BYTES": "104857600"
+    "MAX_SITE_BYTES": "104857600",
+    "MAX_TOTAL_BYTES": "1073741824",
+    "MAX_VERSIONS_PER_SITE": "20"
   },
+  "ratelimits": [
+    { "name": "LOGIN_RATE_LIMIT", "namespace_id": "1001", "simple": { "limit": 10, "period": 60 } },
+    { "name": "WRITE_RATE_LIMIT", "namespace_id": "1002", "simple": { "limit": 6000, "period": 60 } },
+    { "name": "READ_RATE_LIMIT", "namespace_id": "1003", "simple": { "limit": 1200, "period": 60 } }
+  ],
   "secrets": {
     "required": ["ADMIN_PASSWORD", "COOKIE_SIGNING_KEY"]
   },

@@ -4,8 +4,10 @@ import {
   createSite,
   createVersion,
   finalizeVersion,
+  getSiteById,
   recordFile
 } from '../src/repositories/sites';
+import { serveSite } from '../src/site-responder';
 
 const testEnv = env as unknown as Env;
 
@@ -50,7 +52,28 @@ async function seedSite(input: {
 }
 
 describe('R2 site responder', () => {
-  it('serves a mapped subdomain with immutable assets and protects the API', async () => {
+  it('uses edge cache without R2 reads and changes cache key on publish', async () => {
+    await seedSite({ id: 'cache-test', slug: 'cache-test', entryPath: 'index.html', files: [
+      { path: 'index.html', body: 'old', mimeType: 'text/html' }
+    ] });
+    const request = new Request('https://cache-test.sites.example.com/');
+    const site = (await getSiteById(testEnv.DB, 'cache-test'))!;
+    await (await serveSite(request, testEnv, site)).text();
+    await testEnv.SITES.delete('sites/cache-test/cache-test-version/index.html');
+    const cached = await serveSite(request, testEnv, site);
+    expect(cached.headers.get('X-QuickShare-Cache')).toBe('HIT');
+    expect(cached.headers.get('Cache-Control')).toBe('no-cache');
+    await expect(cached.text()).resolves.toBe('old');
+
+    await createVersion(testEnv.DB, { id: 'cache-new', site_id: site.id, file_count: 1, total_bytes: 3 });
+    const object = await testEnv.SITES.put('sites/cache-test/cache-new/index.html', 'new');
+    await recordFile(testEnv.DB, { version_id: 'cache-new', path: 'index.html', size: 3, mime_type: 'text/html', etag: object!.etag });
+    await finalizeVersion(testEnv.DB, site.id, 'cache-new', 'index.html');
+    const updated = await serveSite(request, testEnv, (await getSiteById(testEnv.DB, site.id))!);
+    await expect(updated.text()).resolves.toBe('new');
+  });
+
+  it('serves a mapped subdomain with short-lived assets and protects the API', async () => {
     await seedSite({
       id: 'site-assets',
       slug: 'assets-site',
@@ -69,7 +92,7 @@ describe('R2 site responder', () => {
 
     const asset = await SELF.fetch('https://assets-site.sites.example.com/app.js', { method: 'HEAD' });
     expect(asset.status).toBe(200);
-    expect(asset.headers.get('Cache-Control')).toContain('immutable');
+    expect(asset.headers.get('Cache-Control')).toBe('public, max-age=60');
     expect(asset.headers.get('Content-Length')).toBe('15');
 
     const api = await SELF.fetch('https://assets-site.sites.example.com/api/health');

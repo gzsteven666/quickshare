@@ -3,6 +3,7 @@ import type { Context } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import type { Env } from '../env';
 import { DeploymentError } from '../errors';
+import { claimOperations, MAX_TOTAL_BYTES, MAX_VERSIONS_PER_SITE, positiveLimit } from '../cost-controls';
 import {
   createSite,
   createVersion,
@@ -43,6 +44,10 @@ function errorStatus(error: DeploymentError): ContentfulStatusCode {
       return 401;
     case 'FORBIDDEN':
       return 403;
+    case 'DAILY_OPERATION_LIMIT':
+      return 429;
+    case 'STORAGE_BUDGET_EXCEEDED':
+      return 413;
     default:
       return 400;
   }
@@ -103,6 +108,9 @@ deploymentRoutes.post('/', async (c) => {
       site_id: site.id,
       file_count: manifest.files.length,
       total_bytes: manifest.totalBytes
+    }, Date.now(), {
+      maxTotalBytes: positiveLimit(c.env.MAX_TOTAL_BYTES, MAX_TOTAL_BYTES),
+      maxVersionsPerSite: positiveLimit(c.env.MAX_VERSIONS_PER_SITE, MAX_VERSIONS_PER_SITE)
     });
     await recordManifest(c.env.DB, versionId, manifest.files);
 
@@ -157,6 +165,7 @@ deploymentRoutes.put('/:versionId/files', async (c) => {
     }
 
     const objectKey = `sites/${version.site_id}/${version.id}/${path}`;
+    await claimOperations(c.env.DB, 'writes');
     const uploaded = await c.env.SITES.put(objectKey, body, {
       httpMetadata: { contentType: manifestFile.mime_type }
     });

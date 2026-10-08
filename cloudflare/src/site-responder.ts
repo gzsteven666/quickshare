@@ -5,6 +5,7 @@ import { normalizeRelativePath } from './validation';
 
 export interface SiteResponseOptions {
   preview?: boolean;
+  waitUntil?: (promise: Promise<unknown>) => void;
 }
 
 function pathPrefix(env: Env): string {
@@ -50,6 +51,18 @@ export async function serveSite(
 
   const versionId = site.current_version_id;
   if (!versionId) return notFound();
+  const cacheUrl = new URL(request.url);
+  cacheUrl.search = '';
+  cacheUrl.pathname = `/__quickshare_cache__/${site.id}/${versionId}/${options.preview ? 'preview' : 'site'}${cacheUrl.pathname}`;
+  const cacheKey = new Request(cacheUrl, { method: 'GET' });
+  const cache = await caches.open('quickshare-sites');
+  const cached = await cache.match(cacheKey);
+  if (cached) {
+    const headers = new Headers(cached.headers);
+    headers.set('Cache-Control', headers.get('Content-Type')?.startsWith('text/html') ? 'no-cache' : 'public, max-age=60');
+    headers.set('X-QuickShare-Cache', 'HIT');
+    return new Response(request.method === 'HEAD' ? null : cached.body, { headers });
+  }
   const version = await getVersionById(env.DB, versionId);
   if (!version || version.status !== 'ready') return notFound();
 
@@ -91,7 +104,7 @@ export async function serveSite(
   if (file.mime_type.toLowerCase().startsWith('text/html')) {
     headers.set('Cache-Control', 'no-cache');
   } else {
-    headers.set('Cache-Control', 'public, max-age=31536000, immutable');
+    headers.set('Cache-Control', 'public, max-age=60');
   }
   if (options.preview) {
     headers.set('Content-Security-Policy', 'sandbox allow-scripts');
@@ -103,8 +116,17 @@ export async function serveSite(
     }
   }
 
-  return new Response(request.method === 'HEAD' ? null : object.body, {
+  const response = new Response(request.method === 'HEAD' ? null : object.body, {
     status: 200,
     headers
   });
+  if (request.method === 'GET') {
+    const copy = response.clone();
+    const cacheHeaders = new Headers(copy.headers);
+    cacheHeaders.set('Cache-Control', 'public, max-age=60');
+    const storing = cache.put(cacheKey, new Response(copy.body, { headers: cacheHeaders })).catch(() => {});
+    if (options.waitUntil) options.waitUntil(storing);
+    else await storing;
+  }
+  return response;
 }

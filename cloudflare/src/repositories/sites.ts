@@ -1,4 +1,5 @@
 import { DeploymentError } from '../errors';
+import { MAX_TOTAL_BYTES, MAX_VERSIONS_PER_SITE } from '../cost-controls';
 
 export interface SiteRecord {
   id: string;
@@ -57,12 +58,19 @@ export async function createSite(
 export async function createVersion(
   db: D1Database,
   input: Pick<VersionRecord, 'id' | 'site_id' | 'file_count' | 'total_bytes'>,
-  now = Date.now()
+  now = Date.now(),
+  limits = { maxTotalBytes: MAX_TOTAL_BYTES, maxVersionsPerSite: MAX_VERSIONS_PER_SITE }
 ): Promise<void> {
-  await db.prepare(
+  const result = await db.prepare(
     `INSERT INTO versions (id, site_id, status, file_count, total_bytes, created_at)
-     VALUES (?, ?, 'uploading', ?, ?, ?)`
-  ).bind(input.id, input.site_id, input.file_count, input.total_bytes, now).run();
+     SELECT ?, ?, 'uploading', ?, ?, ?
+     WHERE COALESCE((SELECT SUM(total_bytes) FROM versions), 0) + ? <= ?
+       AND (SELECT COUNT(*) FROM versions WHERE site_id = ?) < ?`
+  ).bind(input.id, input.site_id, input.file_count, input.total_bytes, now,
+    input.total_bytes, limits.maxTotalBytes, input.site_id, limits.maxVersionsPerSite).run();
+  if (result.meta.changes !== 1) {
+    throw new DeploymentError('STORAGE_BUDGET_EXCEEDED', '总存储配额或站点版本数量已达上限，请先清理不再需要的站点。');
+  }
 }
 
 export async function getSiteById(db: D1Database, siteId: string): Promise<SiteRecord | null> {

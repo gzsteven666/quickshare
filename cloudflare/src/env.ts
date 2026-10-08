@@ -8,6 +8,11 @@ export interface Env {
   MAX_FILES?: string;
   MAX_FILE_BYTES?: string;
   MAX_SITE_BYTES?: string;
+  MAX_TOTAL_BYTES?: string;
+  MAX_VERSIONS_PER_SITE?: string;
+  LOGIN_RATE_LIMIT?: RateLimit;
+  WRITE_RATE_LIMIT?: RateLimit;
+  READ_RATE_LIMIT?: RateLimit;
   APP_HOST?: string;
   SITES_BASE_DOMAIN?: string;
 }
